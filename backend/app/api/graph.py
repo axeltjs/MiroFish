@@ -148,15 +148,15 @@ def generate_ontology():
         }
     """
     try:
-        logger.info("=== 开始生成本体定义 ===")
+        logger.info("=== Starting ontology generation ===")
         
         # 获取参数
         simulation_requirement = request.form.get('simulation_requirement', '')
         project_name = request.form.get('project_name', 'Unnamed Project')
         additional_context = request.form.get('additional_context', '')
         
-        logger.debug(f"项目名称: {project_name}")
-        logger.debug(f"模拟需求: {simulation_requirement[:100]}...")
+        logger.debug(f"Project name: {project_name}")
+        logger.debug(f"Simulation requirement: {simulation_requirement[:100]}...")
         
         if not simulation_requirement:
             return jsonify({
@@ -175,7 +175,7 @@ def generate_ontology():
         # 创建项目
         project = ProjectManager.create_project(name=project_name)
         project.simulation_requirement = simulation_requirement
-        logger.info(f"创建项目: {project.project_id}")
+        logger.info(f"Created project: {project.project_id}")
         
         # 保存文件并提取文本
         document_texts = []
@@ -210,10 +210,10 @@ def generate_ontology():
         # 保存提取的文本
         project.total_text_length = len(all_text)
         ProjectManager.save_extracted_text(project.project_id, all_text)
-        logger.info(f"文本提取完成，共 {len(all_text)} 字符")
+        logger.info(f"Text extraction completed, total {len(all_text)} characters")
         
         # 生成本体
-        logger.info("调用 LLM 生成本体定义...")
+        logger.info("Calling LLM to generate ontology...")
         generator = OntologyGenerator()
         ontology = generator.generate(
             document_texts=document_texts,

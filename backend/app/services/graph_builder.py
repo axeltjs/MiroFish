@@ -18,6 +18,10 @@ from ..models.task import TaskManager, TaskStatus
 from ..utils.zep_paging import fetch_all_nodes, fetch_all_edges
 from .text_processor import TextProcessor
 from ..utils.locale import t, get_locale, set_locale
+from ..utils.logger import get_logger
+
+# module logger
+logger = get_logger('mirofish.graphbuilder')
 
 
 @dataclass
@@ -328,20 +332,35 @@ class GraphBuilderService:
                 )
                 
                 # 收集返回的 episode uuid
+                batch_episode_uuids = []
                 if batch_result and isinstance(batch_result, list):
                     for ep in batch_result:
                         ep_uuid = getattr(ep, 'uuid_', None) or getattr(ep, 'uuid', None)
                         if ep_uuid:
                             episode_uuids.append(ep_uuid)
-                
+                            batch_episode_uuids.append(ep_uuid)
+
+                # Log the batch result for debugging
+                if batch_episode_uuids:
+                    logger.info(f"add_batch returned {len(batch_episode_uuids)} episode(s) for batch {batch_num}/{total_batches}: {batch_episode_uuids}")
+                    if progress_callback:
+                        # include short list of episode ids in progress message (avoid too long strings)
+                        short_ids = ','.join(eid[:8] for eid in batch_episode_uuids[:5])
+                        progress_callback(f"Batch {batch_num}/{total_batches} sent, episodes: {short_ids}", (i + len(batch_chunks)) / total_chunks)
+                else:
+                    logger.warning(f"add_batch returned no episode uuids for batch {batch_num}/{total_batches}")
+
                 # 避免请求过快
                 time.sleep(1)
                 
             except Exception as e:
+                logger.error(f"Failed to add batch {batch_num}/{total_batches}: {e}")
                 if progress_callback:
                     progress_callback(t('progress.batchFailed', batch=batch_num, error=str(e)), 0)
                 raise
         
+        # Final log of all episode uuids collected for this upload
+        logger.info(f"Total episodes created: {len(episode_uuids)}")
         return episode_uuids
     
     def _wait_for_episodes(
@@ -371,6 +390,7 @@ class GraphBuilderService:
                         t('progress.episodesTimeout', completed=completed_count, total=total_episodes),
                         completed_count / total_episodes
                     )
+                logger.error(f"Timeout waiting for episodes: pending={len(pending_episodes)}, completed={completed_count}")
                 break
             
             # 检查每个 episode 的处理状态
@@ -378,12 +398,17 @@ class GraphBuilderService:
                 try:
                     episode = self.client.graph.episode.get(uuid_=ep_uuid)
                     is_processed = getattr(episode, 'processed', False)
+                    # log per-episode status for debugging
+                    logger.debug(f"Episode {ep_uuid} processed={is_processed}")
                     
                     if is_processed:
                         pending_episodes.remove(ep_uuid)
                         completed_count += 1
+                        logger.info(f"Episode {ep_uuid} processed (completed_count={completed_count}/{total_episodes})")
                         
                 except Exception as e:
+                    # Log single query error and continue
+                    logger.warning(f"Error fetching episode {ep_uuid}: {e}")
                     # 忽略单个查询错误，继续
                     pass
             

@@ -309,17 +309,43 @@ class OntologyGenerator:
             # 强制将 edge name 转为 SCREAMING_SNAKE_CASE（Zep API 要求）
             if "name" in edge:
                 original_name = edge["name"]
-                edge["name"] = original_name.upper()
+                # Normalize: replace non-alnum with underscore, collapse underscores, uppercase
+                import re
+                safe_edge_name = re.sub(r'[^A-Za-z0-9]+', '_', original_name).strip('_')
+                safe_edge_name = re.sub(r'__+', '_', safe_edge_name).upper() or original_name.upper()
+                edge["name"] = safe_edge_name
                 if edge["name"] != original_name:
                     logger.warning(f"Edge type name '{original_name}' auto-converted to '{edge['name']}'")
             # 修正 source_targets 中的实体名称引用，与转换后的 PascalCase 保持一致
-            for st in edge.get("source_targets", []):
-                if st.get("source") in entity_name_map:
-                    st["source"] = entity_name_map[st["source"]]
-                if st.get("target") in entity_name_map:
-                    st["target"] = entity_name_map[st["target"]]
             if "source_targets" not in edge:
                 edge["source_targets"] = []
+            for st in edge.get("source_targets", []):
+                src = st.get("source")
+                tgt = st.get("target")
+
+                # Try direct mapping from original name
+                if src in entity_name_map:
+                    st["source"] = entity_name_map[src]
+                else:
+                    # Try PascalCase conversion of the provided source and match to existing names
+                    converted_src = _to_pascal_case(src or "")
+                    if converted_src in entity_names:
+                        st["source"] = converted_src
+                    else:
+                        # As a last resort, pick a safe fallback (Person or Organization if present)
+                        st["source"] = "Person" if "Person" in entity_names else ("Organization" if "Organization" in entity_names else converted_src or "Entity")
+                        logger.warning(f"Edge source '{src}' converted to fallback '{st['source']}'")
+
+                if tgt in entity_name_map:
+                    st["target"] = entity_name_map[tgt]
+                else:
+                    converted_tgt = _to_pascal_case(tgt or "")
+                    if converted_tgt in entity_names:
+                        st["target"] = converted_tgt
+                    else:
+                        st["target"] = "Person" if "Person" in entity_names else ("Organization" if "Organization" in entity_names else converted_tgt or "Entity")
+                        logger.warning(f"Edge target '{tgt}' converted to fallback '{st['target']}'")
+
             if "attributes" not in edge:
                 edge["attributes"] = []
             if len(edge.get("description", "")) > 100:
