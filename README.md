@@ -201,3 +201,12 @@ MiroFish's simulation engine is powered by **[OASIS (Open Agent Social Interacti
    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=666ghj/MiroFish&type=date&legend=top-left" />
  </picture>
 </a>
+
+----
+
+## How to download reports:
+
+- http://127.0.0.1:5001/api/report/<report_id>/download/zip
+- curl -o report.pdf "http://127.0.0.1:5001/api/report/<report_id>/download/pdf"
+replace <report_id> with your actual report id
+contoh: `curl -o report.pdf "http://127.0.0.1:5001/api/report/report_0053f1594896/download/pdf"`

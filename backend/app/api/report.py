@@ -441,6 +441,218 @@ def download_report(report_id: str):
         }), 500
 
 
+@report_bp.route('/<report_id>/download/zip', methods=['GET'])
+def download_report_zip(report_id: str):
+    """
+    Download the entire report folder as a zip archive.
+    The report folder is located at backend/uploads/reports/{report_id}/
+    This endpoint will create a temporary zip file and return it as attachment.
+    """
+    try:
+        report = ReportManager.get_report(report_id)
+        if not report:
+            return jsonify({
+                "success": False,
+                "error": t('api.reportNotFound', id=report_id)
+            }), 404
+
+        report_folder = ReportManager._get_report_folder(report_id)
+        if not os.path.exists(report_folder):
+            return jsonify({
+                "success": False,
+                "error": t('api.reportNotFound', id=report_id)
+            }), 404
+
+        import tempfile
+        import shutil
+        from flask import after_this_request
+
+        tmp_dir = tempfile.mkdtemp(prefix=f"{report_id}_zip_")
+        zip_base = os.path.join(tmp_dir, report_id)
+        archive_path = shutil.make_archive(zip_base, 'zip', report_folder)
+
+        @after_this_request
+        def cleanup(response):
+            try:
+                # remove the created archive and temp dir
+                if os.path.exists(archive_path):
+                    os.remove(archive_path)
+                if os.path.exists(tmp_dir):
+                    shutil.rmtree(tmp_dir)
+            except Exception as e:
+                logger.warning(f"Failed to cleanup temp zip: {e}")
+            return response
+
+        return send_file(
+            archive_path,
+            as_attachment=True,
+            download_name=f"{report_id}.zip",
+            mimetype='application/zip'
+        )
+
+    except Exception as e:
+        logger.error(f"Downloading report zip failed: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+@report_bp.route('/<report_id>/download/pdf', methods=['GET'])
+def download_report_pdf(report_id: str):
+    """
+    Generate a single PDF from the report markdown files and return it as attachment.
+    Tries available converters in order: WeasyPrint, pdfkit (wkhtmltopdf), xhtml2pdf.
+    If none are available, returns an informative error message telling the user what to install.
+    """
+    try:
+        report = ReportManager.get_report(report_id)
+        if not report:
+            return jsonify({"success": False, "error": t('api.reportNotFound', id=report_id)}), 404
+
+        report_folder = ReportManager._get_report_folder(report_id)
+        if not os.path.exists(report_folder):
+            return jsonify({"success": False, "error": t('api.reportNotFound', id=report_id)}), 404
+
+        # 1. Collect markdown content
+        md_path = ReportManager._get_report_markdown_path(report_id)
+        markdown_text = None
+        if os.path.exists(md_path):
+            with open(md_path, 'r', encoding='utf-8') as f:
+                markdown_text = f.read()
+        else:
+            # concatenate section files in order
+            sections = []
+            for fname in sorted(os.listdir(report_folder)):
+                if fname.startswith('section_') and fname.endswith('.md'):
+                    sections.append(os.path.join(report_folder, fname))
+            parts = []
+            for sec in sections:
+                with open(sec, 'r', encoding='utf-8') as f:
+                    parts.append(f.read())
+            if parts:
+                markdown_text = "\n\n".join(parts)
+            else:
+                # fallback to report.markdown_content if available
+                if getattr(report, 'markdown_content', None):
+                    markdown_text = report.markdown_content
+
+        if not markdown_text:
+            return jsonify({"success": False, "error": "No markdown content available for this report."}), 404
+
+        # 2. Convert markdown to HTML
+        html = None
+        try:
+            import markdown as md
+            html_body = md.markdown(markdown_text, extensions=['extra', 'tables', 'toc'])
+            # Simple HTML template with basic print CSS
+            html = f"""<!doctype html>
+<html>
+<head>
+<meta charset='utf-8'>
+<style>
+body { font-family: Arial, Helvetica, sans-serif; margin: 1in; }
+h1,h2,h3,h4 { color: #222 }
+pre { background: #f6f8fa; padding: 10px; overflow: auto }
+code { background: #f6f8fa; padding: 2px 4px }
+table { border-collapse: collapse; width: 100% }
+td, th { border: 1px solid #ddd; padding: 6px }
+</style>
+</head>
+<body>
+{html_body}
+</body>
+</html>"""
+        except Exception as e:
+            logger.warning(f"markdown package not available or conversion failed: {e}")
+            html = None
+
+        # 3. Try converters
+        import tempfile
+        import shutil
+        from flask import after_this_request
+
+        tmp_dir = tempfile.mkdtemp(prefix=f"{report_id}_pdf_")
+        pdf_path = os.path.join(tmp_dir, f"{report_id}.pdf")
+
+        converter_used = None
+        try:
+            # Try WeasyPrint
+            try:
+                from weasyprint import HTML
+                if html is None:
+                    # fallback: write plain text inside HTML
+                    html = f"<pre>{markdown_text}</pre>"
+                HTML(string=html).write_pdf(pdf_path)
+                converter_used = 'weasyprint'
+            except Exception as we:
+                logger.info(f"WeasyPrint not available or failed: {we}")
+                # Try pdfkit (requires wkhtmltopdf installed)
+                try:
+                    import pdfkit
+                    if html is None:
+                        html = f"<pre>{markdown_text}</pre>"
+                    # use pdfkit to write pdf
+                    pdfkit.from_string(html, pdf_path)
+                    converter_used = 'pdfkit'
+                except Exception as pk:
+                    logger.info(f"pdfkit not available or failed: {pk}")
+                    # Try xhtml2pdf
+                    try:
+                        from xhtml2pdf import pisa
+                        if html is None:
+                            html = f"<pre>{markdown_text}</pre>"
+                        with open(pdf_path, 'wb') as result_file:
+                            pisa_status = pisa.CreatePDF(html, dest=result_file)
+                        if pisa_status.err:
+                            raise RuntimeError('xhtml2pdf failed to create PDF')
+                        converter_used = 'xhtml2pdf'
+                    except Exception as x2p:
+                        logger.info(f"xhtml2pdf not available or failed: {x2p}")
+                        converter_used = None
+
+            if not converter_used:
+                # No converter available
+                raise RuntimeError(
+                    "No PDF converter available. Please install one of: weasyprint, pdfkit (with wkhtmltopdf), or xhtml2pdf."
+                )
+
+            # Serve the generated PDF
+            @after_this_request
+            def cleanup(response):
+                try:
+                    if os.path.exists(pdf_path):
+                        os.remove(pdf_path)
+                    if os.path.exists(tmp_dir):
+                        shutil.rmtree(tmp_dir)
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp pdf: {e}")
+                return response
+
+            return send_file(
+                pdf_path,
+                as_attachment=True,
+                download_name=f"{report_id}.pdf",
+                mimetype='application/pdf'
+            )
+
+        finally:
+            # if converter failed and file exists, try to cleanup here as well
+            if converter_used is None:
+                try:
+                    if os.path.exists(pdf_path):
+                        os.remove(pdf_path)
+                    if os.path.exists(tmp_dir):
+                        shutil.rmtree(tmp_dir)
+                except Exception:
+                    pass
+
+    except Exception as e:
+        logger.error(f"Downloading report pdf failed: {e}")
+        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+
+
 @report_bp.route('/<report_id>', methods=['DELETE'])
 def delete_report(report_id: str):
     """删除报告"""
