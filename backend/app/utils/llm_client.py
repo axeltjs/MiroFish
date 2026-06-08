@@ -67,6 +67,36 @@ class LLMClient:
         content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
         return content
     
+    def chat_with_image(
+        self,
+        image_base64: str,
+        mime_type: str,
+        prompt: str,
+        max_tokens: int = 2048
+    ) -> str:
+        """
+        Send a chat request with an inline base64-encoded image.
+
+        Uses LLM_VISION_MODEL_NAME which should point to a vision-capable model
+        (e.g. qwen-vl-plus on DashScope, gpt-4o on OpenAI).
+        """
+        messages = [{
+            "role": "user",
+            "content": [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime_type};base64,{image_base64}"}
+                },
+                {"type": "text", "text": prompt}
+            ]
+        }]
+        response = self.client.chat.completions.create(
+            model=Config.LLM_VISION_MODEL_NAME,
+            messages=messages,
+            max_tokens=max_tokens
+        )
+        return response.choices[0].message.content or ""
+
     def chat_json(
         self,
         messages: List[Dict[str, str]],

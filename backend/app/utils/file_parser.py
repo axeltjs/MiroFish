@@ -60,8 +60,9 @@ def _read_text_with_fallback(file_path: str) -> str:
 
 class FileParser:
     """文件解析器"""
-    
-    SUPPORTED_EXTENSIONS = {'.pdf', '.md', '.markdown', '.txt'}
+
+    SUPPORTED_EXTENSIONS = {'.pdf', '.md', '.markdown', '.txt', '.png', '.jpg', '.jpeg', '.webp'}
+    IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp'}
     
     @classmethod
     def extract_text(cls, file_path: str) -> str:
@@ -90,25 +91,78 @@ class FileParser:
             return cls._extract_from_md(file_path)
         elif suffix == '.txt':
             return cls._extract_from_txt(file_path)
-        
+        elif suffix in cls.IMAGE_EXTENSIONS:
+            return cls._extract_from_image(file_path)
+
         raise ValueError(f"无法处理的文件格式: {suffix}")
     
     @staticmethod
     def _extract_from_pdf(file_path: str) -> str:
-        """从PDF提取文本"""
+        """
+        Extracts text and embedded images from a PDF.
+
+        For each page:
+        - Text is extracted via page.get_text().
+        - Embedded image objects (charts, diagrams, figures) are extracted via
+          page.get_images() and described by the vision LLM.
+
+        Images smaller than 100x100 px are skipped (icons / decorations).
+        Duplicate xrefs across pages are skipped to avoid re-processing the same image.
+        """
         try:
             import fitz  # PyMuPDF
         except ImportError:
             raise ImportError("需要安装PyMuPDF: pip install PyMuPDF")
-        
-        text_parts = []
+
+        import base64
+        from .llm_client import LLMClient
+
+        parts = []
+        seen_xrefs: set = set()
+        llm_client = None  # lazy-init only when an image is found
+
         with fitz.open(file_path) as doc:
-            for page in doc:
+            for page_num, page in enumerate(doc, start=1):
+                # --- text ---
                 text = page.get_text()
                 if text.strip():
-                    text_parts.append(text)
-        
-        return "\n\n".join(text_parts)
+                    parts.append(text)
+
+                # --- embedded images ---
+                for img_info in page.get_images(full=True):
+                    xref = img_info[0]
+                    if xref in seen_xrefs:
+                        continue
+                    seen_xrefs.add(xref)
+
+                    try:
+                        img_dict = doc.extract_image(xref)
+                        width, height = img_dict.get("width", 0), img_dict.get("height", 0)
+                        # skip tiny decorative images
+                        if width < 100 or height < 100:
+                            continue
+
+                        img_bytes = img_dict["image"]
+                        ext = img_dict.get("ext", "png")
+                        mime_type = f"image/{ext}" if ext != "jpg" else "image/jpeg"
+                        img_base64 = base64.b64encode(img_bytes).decode("utf-8")
+
+                        if llm_client is None:
+                            llm_client = LLMClient()
+
+                        prompt = (
+                            "Analyze this image extracted from a PDF document. "
+                            "Describe all visible content including: text, numbers, labels, "
+                            "chart/graph data and trends, table contents, diagrams, and key insights. "
+                            "Be specific and detailed."
+                        )
+                        description = llm_client.chat_with_image(img_base64, mime_type, prompt)
+                        parts.append(f"[Image on page {page_num}]: {description}")
+                    except Exception:
+                        # silently skip unreadable images
+                        continue
+
+        return "\n\n".join(parts)
     
     @staticmethod
     def _extract_from_md(file_path: str) -> str:
@@ -119,6 +173,29 @@ class FileParser:
     def _extract_from_txt(file_path: str) -> str:
         """从TXT提取文本，支持自动编码检测"""
         return _read_text_with_fallback(file_path)
+
+    @staticmethod
+    def _extract_from_image(file_path: str) -> str:
+        """
+        从图片提取内容描述，通过 vision LLM 分析图像。
+        支持 PNG、JPG、JPEG、WEBP。
+        """
+        import base64
+        import mimetypes
+        from .llm_client import LLMClient
+
+        mime_type = mimetypes.guess_type(file_path)[0] or "image/png"
+        with open(file_path, "rb") as f:
+            image_base64 = base64.b64encode(f.read()).decode("utf-8")
+
+        client = LLMClient()
+        prompt = (
+            "Analyze this image thoroughly. Describe all visible content including: "
+            "any text, numbers, labels, chart/graph data and trends, table contents, "
+            "diagrams, figures, and key insights. Be specific and detailed so the "
+            "description can be used to build a knowledge graph."
+        )
+        return client.chat_with_image(image_base64, mime_type, prompt)
     
     @classmethod
     def extract_from_multiple(cls, file_paths: List[str]) -> str:
