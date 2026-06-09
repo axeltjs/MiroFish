@@ -2700,15 +2700,78 @@ def close_simulation_env():
             "success": result.get("success", False),
             "data": result
         })
-        
+
     except ValueError as e:
         return jsonify({
             "success": False,
             "error": str(e)
         }), 400
-        
+
     except Exception as e:
         logger.error(f"关闭环境失败: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+# ============== 删除模拟接口 ==============
+
+@simulation_bp.route('/<simulation_id>', methods=['DELETE'])
+def delete_simulation(simulation_id: str):
+    """
+    删除一条模拟记录及其所有关联数据。
+
+    删除范围：
+    - uploads/simulations/{simulation_id}/  (模拟配置、profiles、运行日志)
+    - uploads/reports/{report_id}/          (关联报告，如存在)
+    - uploads/projects/{project_id}/        (关联项目文件、本体)
+
+    返回：
+        { "success": true, "deleted": { "simulation": true, "report": true, "project": true } }
+    """
+    import shutil
+
+    try:
+        manager = SimulationManager()
+        state = manager.get_simulation(simulation_id)
+
+        deleted = {"simulation": False, "report": False, "project": False}
+
+        # ── 1. 删除模拟目录 ────────────────────────────────────
+        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
+        if os.path.exists(sim_dir):
+            shutil.rmtree(sim_dir)
+            deleted["simulation"] = True
+            logger.info(f"删除模拟目录: {sim_dir}")
+
+        # ── 2. 删除关联报告 ────────────────────────────────────
+        report_id = _get_report_id_for_simulation(simulation_id)
+        if report_id:
+            reports_dir = os.path.join(os.path.dirname(__file__), '../../uploads/reports')
+            report_dir = os.path.join(reports_dir, report_id)
+            if os.path.exists(report_dir):
+                shutil.rmtree(report_dir)
+                deleted["report"] = True
+                logger.info(f"删除关联报告目录: {report_dir}")
+
+        # ── 3. 删除关联项目 ────────────────────────────────────
+        if state and state.project_id:
+            from ..models.project import ProjectManager
+            success = ProjectManager.delete_project(state.project_id)
+            deleted["project"] = success
+            if success:
+                logger.info(f"删除关联项目: {state.project_id}")
+
+        return jsonify({
+            "success": True,
+            "simulation_id": simulation_id,
+            "deleted": deleted
+        })
+
+    except Exception as e:
+        logger.error(f"删除模拟失败: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e),

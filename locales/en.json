@@ -282,7 +282,10 @@
     "errorOccurred": "Sorry, an error occurred: {error}",
     "noResponse": "No response",
     "requestFailed": "Request failed",
-    "selectAgentFirst": "Please select a simulated individual first"
+    "selectAgentFirst": "Please select a simulated individual first",
+    "brandMode": "Brand Mode",
+    "brandContextLabel": "Your Brand Context",
+    "brandContextPlaceholder": "Describe your brand: name, products, positioning, target audience, key values... The agent will analyze simulation findings from your brand's perspective."
   },
   "graph": {
     "panelTitle": "Graph Relationship Visualization",

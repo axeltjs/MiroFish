@@ -131,6 +131,18 @@
                 </div>
               </div>
             </div>
+            <button
+              v-if="chatTarget === 'report_agent' && activeTab === 'chat'"
+              class="tab-pill brand-mode-pill"
+              :class="{ active: brandMode }"
+              @click="brandMode = !brandMode"
+              :title="$t('step5.brandMode')"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+              </svg>
+              <span>{{ $t('step5.brandMode') }}</span>
+            </button>
             <div class="tab-divider"></div>
             <button
               class="tab-pill survey-pill"
@@ -287,6 +299,22 @@
             </div>
           </div>
 
+          <!-- Brand Context Panel -->
+          <div v-if="brandMode && chatTarget === 'report_agent'" class="brand-context-panel">
+            <div class="brand-panel-header">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+              </svg>
+              <span>{{ $t('step5.brandContextLabel') }}</span>
+            </div>
+            <textarea
+              v-model="brandContext"
+              class="brand-context-input"
+              :placeholder="$t('step5.brandContextPlaceholder')"
+              rows="3"
+            ></textarea>
+          </div>
+
           <!-- Chat Input -->
           <div class="chat-input-area">
             <textarea 
@@ -441,6 +469,10 @@ const chatHistoryCache = ref({}) // 缓存所有对话记录: { 'report_agent': 
 const isSending = ref(false)
 const chatMessages = ref(null)
 const chatInputRef = ref(null)
+
+// Brand Consultant Mode
+const brandMode = ref(false)
+const brandContext = ref('')
 
 // Survey State
 const selectedAgents = ref(new Set())
@@ -694,7 +726,8 @@ const sendToReportAgent = async (message) => {
   const res = await chatWithReport({
     simulation_id: props.simulationId,
     message: message,
-    chat_history: historyForApi
+    chat_history: historyForApi,
+    brand_context: (brandMode.value && brandContext.value.trim()) ? brandContext.value.trim() : undefined
   })
   
   if (res.success && res.data) {
@@ -1434,6 +1467,69 @@ watch(() => props.simulationId, (newId) => {
   background: #047857;
   color: #FFFFFF;
   box-shadow: 0 2px 8px rgba(4, 120, 87, 0.2);
+}
+
+.brand-mode-pill {
+  background: #FFF7ED;
+  color: #C2410C;
+}
+
+.brand-mode-pill:hover {
+  background: #FED7AA;
+  color: #9A3412;
+}
+
+.brand-mode-pill.active {
+  background: #EA580C;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
+}
+
+/* Brand Context Panel */
+.brand-context-panel {
+  margin: 0 24px 0;
+  padding: 12px 14px;
+  background: #FFF7ED;
+  border: 1px solid #FED7AA;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.brand-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #C2410C;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.brand-context-input {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  border: 1px solid #FDBA74;
+  border-radius: 6px;
+  resize: none;
+  background: #FFFBF7;
+  color: #1C1917;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.brand-context-input:focus {
+  outline: none;
+  border-color: #EA580C;
+}
+
+.brand-context-input::placeholder {
+  color: #A8A29E;
 }
 
 /* Interaction Header */

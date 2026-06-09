@@ -1,0 +1,115 @@
+# ============================================================
+#  MiroFish — Brand Knowledge
+# ============================================================
+#  Isi template ini dengan informasi brand kamu.
+#  Setelah diisi, ubah baris di bawah menjadi:  enabled = true
+# ============================================================
+
+enabled = false
+
+# ── Identitas Brand ─────────────────────────────────────────
+
+[brand]
+name                                = "Mitsubishi Motors"
+tagline                             = "Drive Your Ambition"
+industry                            = "Automotive"
+official_company_name               = "PT Mitsubishi Motors Krama Yudha Sales Indonesia"
+country                             = "Indonesia"
+website                             = "www.mitsubishi-motors.co.id"
+
+# ── Produk & Layanan ────────────────────────────────────────
+# Salin blok [[brand.products]] untuk menambah produk lebih banyak.
+
+[[brand.products]]
+name           = "Mitsubishi Destinator"
+description    = "Medium Premium Family SUV, 7 penumpang, Medium SUV, monokok. 1.5L Turbo Mivec 4B40"
+target_segment = "keluarga premium, eksekutif muda, pengguna yang mengutamakan kenyamanan dan teknologi"
+variant        = "GLS, EXCEED, ULTIMATE, ULTIMATE PREMIUM"
+price_tier     = "Rp 397 juta – Rp 520 juta"
+key_benefit    = "kabin premium terluas di kelasnya, panoramic sunroof, ADAS (Forward Collision Warning, Lane Departure Warning, Auto High Beam), desain premium"
+
+[[brand.products]]
+name           = "Mitsubishi Xpander"
+description    = "Mobil Low MPV dengan kapasitas 7 penumpang, 1.5L Mivec, Front wheel drive"
+target_segment = "keluarga muda, pengguna harian perkotaan dan luar kota"
+variant        = "GLS, EXCEED TOURER, ULTIMATE"
+price_tier     = "Rp 260 juta – Rp 345 juta (harga Jakarta)"
+key_benefit    = "kabin luas, fleksibilitas bangku, ground clearance tinggi 205mm, desain sporty"
+
+[[brand.products]]
+name           = "Mitsubishi Xpander Cross"
+description    = "Mobil Low SUV dengan kapasitas 7 penumpang, turunan dari Xpander, 1.5L Mivec, Front wheel drive"
+target_segment = "keluarga muda, pengguna harian perkotaan dan luar kota"
+variant        = "MT, Premium CVT"
+price_tier     = "Rp 345 juta – Rp 371 juta (harga Jakarta)"
+key_benefit    = "tampilan lebih maskulin, ground clearance lebih tinggi, mode AYC (Active Yaw Control)"
+
+[[brand.products]]
+name           = "Mitsubishi Xforce"
+description    = "Compact SUV / Subcompact SUV, 5 penumpang, 1.5L MIVEC bensin (105 hp), transmisi CVT"
+target_segment = "urban profesional, milenial, pengguna pertama SUV, secondary car owner"
+variant        = "EXCEED, ULTIMATE, ULTIMATE DIAMOND SENSE"
+price_tier     = "Rp 340 juta – Rp 420 juta (harga Jakarta)"
+key_benefit    = "desain coupe SUV sporty, panoramic sunroof, ground clearance 222mm (tertinggi di kelasnya), ADAS, Premium Yamaha Speaker"
+
+[[brand.products]]
+name           = "Mitsubishi Pajero Sport"
+description    = "Ladder Frame, Diesel, Medium SUV, 7 penumpang, 2.4L MIVEC Turbo Diesel (181 hp), 8AT (otomatis), dan Manual Transmission"
+target_segment = "petualang, profesional, pengguna medan berat"
+variant        = "GLX, EXCEED, DAKAR, DAKAR ULTIMATE"
+price_tier     = "Rp 586 juta – Rp 789 juta (harga Jakarta)"
+key_benefit    = "off-road capability tinggi, ground clearance 218mm, towing capacity 3.1 ton, diesel torque besar"
+
+[[brand.products]]
+name           = "Mitsubishi Triton"
+description    = "Medium Pickup Truck / Double Cabin, 2.4L MIVEC Diesel (181 hp) — DIESEL, LADDER FRAME"
+target_segment = "pebisnis, petani, pengguna komersial, off-road enthusiast"
+variant        = "GLX, HDX, GLS, Exceed, ULTIMATE"
+price_tier     = "Rp 440 juta – Rp 600 jutaan (harga Jakarta)"
+key_benefit    = "payload besar, towing tinggi, off-road kapabel, cocok untuk kerja berat"
+
+[[brand.products]]
+name           = "Mitsubishi L300"
+description    = "Light Commercial / Van / Pick-up kecil"
+target_segment = "usaha kecil-menengah, pengiriman barang, angkutan umum"
+price_tier     = "Rp 243 juta – Rp 245,5 juta (harga Jakarta)"
+key_benefit    = "payload besar, cocok untuk kerja berat"
+
+# ── Positioning ─────────────────────────────────────────────
+
+[brand.positioning]
+value_proposition     = ""   # Kenapa konsumen harus pilih brand ini?
+competitive_advantage = ""   # Keunggulan vs kompetitor?
+personality           = []   # Kata sifat brand: ["inovatif", "terpercaya", "ramah"]
+tone_of_voice         = ""   # Gaya komunikasi: formal / casual / playful / authoritative
+
+# ── Target Audiens ──────────────────────────────────────────
+
+[brand.audience]
+primary             = ""     # Segmen utama (demografi, psikografi)
+secondary           = ""     # Segmen sekunder
+key_pain_points     = []     # Masalah utama yang diselesaikan brand: ["...", "..."]
+key_desires         = []     # Aspirasi konsumen: ["...", "..."]
+
+# ── Kompetitor ──────────────────────────────────────────────
+# Salin blok [[brand.competitors]] untuk menambah lebih banyak.
+
+[[brand.competitors]]
+name               = ""   # Nama kompetitor
+our_differentiator = ""   # Mengapa konsumen pilih kita vs mereka?
+
+# [[brand.competitors]]
+# name               = ""
+# our_differentiator = ""
+
+# ── Tujuan & Konteks Saat Ini ───────────────────────────────
+
+[brand.goals]
+short_term = ""   # Target 3-6 bulan ke depan
+long_term  = ""   # Visi jangka panjang
+
+[brand.context]
+current_challenges  = ""   # Tantangan yang sedang dihadapi brand
+recent_campaigns    = ""   # Kampanye / inisiatif terbaru yang relevan
+sensitive_topics    = []   # Topik yang harus dihindari: ["...", "..."]
+additional_notes    = ""   # Informasi lain yang perlu diketahui AI

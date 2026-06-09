@@ -835,7 +835,7 @@ CHAT_SYSTEM_PROMPT_TEMPLATE = """\
 【已生成的分析报告】
 {report_content}
 
-【规则】
+{brand_context_section}【规则】
 1. 优先基于上述报告内容回答问题
 2. 直接回答问题，避免冗长的思考论述
 3. 仅在报告内容不足以回答时，才调用工具检索更多数据
@@ -853,6 +853,21 @@ CHAT_SYSTEM_PROMPT_TEMPLATE = """\
 - 简洁直接，不要长篇大论
 - 使用 > 格式引用关键内容
 - 优先给出结论，再解释原因"""
+
+BRAND_CONSULTANT_SECTION_TEMPLATE = """\
+【品牌顾问模式】
+你同时扮演资深品牌战略顾问的角色。
+
+【品牌信息】
+{brand_context}
+
+在回答每个问题时，从品牌顾问视角出发：
+1. 分析模拟情境（舆论走向、Agent 行为、事件发展）对该品牌和产品的具体影响
+2. 将模拟发现与品牌定位、产品线相匹配，识别协同点或冲突点
+3. 指出潜在的品牌风险与市场机会
+4. 给出简洁可执行的品牌策略建议
+
+"""
 
 CHAT_OBSERVATION_SUFFIX = "\n\n请简洁回答问题。"
 
@@ -1764,19 +1779,21 @@ class ReportAgent:
             return report
     
     def chat(
-        self, 
+        self,
         message: str,
-        chat_history: List[Dict[str, str]] = None
+        chat_history: List[Dict[str, str]] = None,
+        brand_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         与Report Agent对话
-        
+
         在对话中Agent可以自主调用检索工具来回答问题
-        
+
         Args:
             message: 用户消息
             chat_history: 对话历史
-            
+            brand_context: 品牌信息（启用品牌顾问模式）
+
         Returns:
             {
                 "response": "Agent回复",
@@ -1785,7 +1802,7 @@ class ReportAgent:
             }
         """
         logger.info(t('report.agentChat', message=message[:50]))
-        
+
         chat_history = chat_history or []
         
         # 获取已生成的报告内容
@@ -1800,10 +1817,21 @@ class ReportAgent:
         except Exception as e:
             logger.warning(t('report.fetchReportFailed', error=e))
         
+        # Resolve brand context: UI input takes precedence over the hardcoded file.
+        from ..utils.brand_loader import load_brand_knowledge
+        effective_brand_context = (brand_context or "").strip() or load_brand_knowledge()
+
+        brand_context_section = ""
+        if effective_brand_context:
+            brand_context_section = BRAND_CONSULTANT_SECTION_TEMPLATE.format(
+                brand_context=effective_brand_context
+            )
+
         system_prompt = CHAT_SYSTEM_PROMPT_TEMPLATE.format(
             simulation_requirement=self.simulation_requirement,
             report_content=report_content if report_content else "（暂无报告）",
             tools_description=self._get_tools_description(),
+            brand_context_section=brand_context_section,
         )
         system_prompt = f"{system_prompt}\n\n{get_language_instruction()}"
 

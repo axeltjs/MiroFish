@@ -714,6 +714,7 @@ def chat_with_report_agent():
         simulation_id = data.get('simulation_id')
         message = data.get('message')
         chat_history = data.get('chat_history', [])
+        brand_context = data.get('brand_context') or None
         
         if not simulation_id:
             return jsonify({
@@ -760,7 +761,7 @@ def chat_with_report_agent():
             simulation_requirement=simulation_requirement
         )
         
-        result = agent.chat(message=message, chat_history=chat_history)
+        result = agent.chat(message=message, chat_history=chat_history, brand_context=brand_context)
         
         return jsonify({
             "success": True,

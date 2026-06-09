@@ -29,21 +29,48 @@
         @mouseleave="hoveringCard = null"
         @click="navigateToProject(project)"
       >
+        <!-- 删除确认 overlay -->
+        <Transition name="confirm-fade">
+          <div
+            v-if="confirmingDeleteId === project.simulation_id"
+            class="delete-confirm-overlay"
+            @click.stop
+          >
+            <span class="delete-confirm-text">Delete?</span>
+            <div class="delete-confirm-actions">
+              <button class="delete-confirm-yes" @click="confirmDelete($event, project.simulation_id)">Yes</button>
+              <button class="delete-confirm-no"  @click="cancelDelete($event)">No</button>
+            </div>
+          </div>
+        </Transition>
+
+        <!-- 删除中 overlay -->
+        <div v-if="deletingId === project.simulation_id" class="delete-loading-overlay" @click.stop>
+          <span class="delete-loading-spinner"></span>
+        </div>
+
+        <!-- 删除按钮 -->
+        <button
+          class="card-delete-btn"
+          @click="requestDelete($event, project.simulation_id)"
+          title="Delete simulation"
+        >×</button>
+
         <!-- 卡片头部：simulation_id 和 功能可用状态 -->
         <div class="card-header">
           <span class="card-id">{{ formatSimulationId(project.simulation_id) }}</span>
           <div class="card-status-icons">
-            <span 
-              class="status-icon" 
+            <span
+              class="status-icon"
               :class="{ available: project.project_id, unavailable: !project.project_id }"
               :title="$t('history.graphBuild')"
             >◇</span>
-            <span 
-              class="status-icon available" 
+            <span
+              class="status-icon available"
               :title="$t('history.envSetup')"
             >◈</span>
-            <span 
-              class="status-icon" 
+            <span
+              class="status-icon"
               :class="{ available: project.report_id, unavailable: !project.report_id }"
               :title="$t('history.analysisReport')"
             >◆</span>
@@ -194,7 +221,7 @@
 import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getSimulationHistory } from '../api/simulation'
+import { getSimulationHistory, deleteSimulation } from '../api/simulation'
 
 const router = useRouter()
 const route = useRoute()
@@ -207,6 +234,8 @@ const isExpanded = ref(false)
 const hoveringCard = ref(null)
 const historyContainer = ref(null)
 const selectedProject = ref(null)  // 当前选中的项目（用于弹窗）
+const confirmingDeleteId = ref(null)  // simulation_id 正在等待确认删除
+const deletingId = ref(null)          // simulation_id 正在删除中
 let observer = null
 let isAnimating = false  // 动画锁，防止闪烁
 let expandDebounceTimer = null  // 防抖定时器
@@ -433,6 +462,33 @@ const goToReport = () => {
       params: { reportId: selectedProject.value.report_id }
     })
     closeModal()
+  }
+}
+
+// 请求删除确认
+const requestDelete = (event, simulationId) => {
+  event.stopPropagation()
+  confirmingDeleteId.value = simulationId
+}
+
+// 取消删除
+const cancelDelete = (event) => {
+  event.stopPropagation()
+  confirmingDeleteId.value = null
+}
+
+// 确认删除
+const confirmDelete = async (event, simulationId) => {
+  event.stopPropagation()
+  confirmingDeleteId.value = null
+  deletingId.value = simulationId
+  try {
+    await deleteSimulation(simulationId)
+    projects.value = projects.value.filter(p => p.simulation_id !== simulationId)
+  } catch (err) {
+    console.error('删除失败:', err)
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -685,6 +741,126 @@ onUnmounted(() => {
 
 .project-card.hovering {
   z-index: 1000 !important;
+}
+
+/* ── Delete button ── */
+.card-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #D1D5DB;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  z-index: 20;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  padding: 0;
+}
+
+.card-delete-btn:hover {
+  background: #FEF2F2;
+  color: #EF4444;
+  border-color: #FCA5A5;
+}
+
+/* ── Delete confirm overlay ── */
+.delete-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.96);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 30;
+  border: 1px solid #E5E7EB;
+}
+
+.delete-confirm-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #111827;
+  letter-spacing: 0.5px;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.delete-confirm-yes,
+.delete-confirm-no {
+  padding: 6px 18px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 3px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: all 0.15s ease;
+}
+
+.delete-confirm-yes {
+  background: #111827;
+  color: #FFFFFF;
+  border: 1px solid #111827;
+}
+
+.delete-confirm-yes:hover {
+  background: #EF4444;
+  border-color: #EF4444;
+}
+
+.delete-confirm-no {
+  background: transparent;
+  color: #6B7280;
+  border: 1px solid #E5E7EB;
+}
+
+.delete-confirm-no:hover {
+  border-color: #9CA3AF;
+  color: #111827;
+}
+
+/* ── Delete loading overlay ── */
+.delete-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+
+.delete-loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #E5E7EB;
+  border-top-color: #6B7280;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* ── Confirm fade transition ── */
+.confirm-fade-enter-active,
+.confirm-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.confirm-fade-enter-from,
+.confirm-fade-leave-to {
+  opacity: 0;
 }
 
 /* 卡片头部 */
