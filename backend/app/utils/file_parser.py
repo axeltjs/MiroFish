@@ -58,6 +58,43 @@ def _read_text_with_fallback(file_path: str) -> str:
     return data.decode(encoding, errors='replace')
 
 
+_VISION_PROMPT = (
+    "You are analyzing an image so its content can be used to build a knowledge graph. "
+    "Describe EVERYTHING you can identify, in detail:\n\n"
+    "1. OBJECTS & PRODUCTS: Identify every distinct physical object. For vehicles, state "
+    "the body type (SUV, sedan, pickup, MPV, hatchback), apparent brand/manufacturer and "
+    "model if recognizable from badges, logos, grille, or styling, body color, and notable "
+    "features. For any product, name the category and brand if visible.\n"
+    "2. PEOPLE: number of people, apparent role, activity, expression, clothing.\n"
+    "3. SCENE & SETTING: location, environment, time of day, mood/atmosphere, lighting.\n"
+    "4. BRANDING: any logos, brand names, taglines, or product names visible.\n"
+    "5. TEXT & COPYWRITING: transcribe ALL visible text verbatim (headlines, copy, captions, "
+    "prices, labels, fine print).\n"
+    "6. DATA & GRAPHICS: if there are charts, graphs, tables, or diagrams, describe their "
+    "data, trends, and key insights.\n"
+    "7. COMPOSITION: overall layout and what the image is communicating (e.g. an advertisement, "
+    "a product key visual, a report figure).\n\n"
+    "Be specific and concrete. If you are uncertain about a brand or model, say what it most "
+    "closely resembles rather than omitting it."
+)
+
+
+def _build_vision_prompt() -> str:
+    """
+    Base vision prompt, optionally augmented with the brand's product catalog
+    so the model can match photographed products/vehicles against known models.
+    """
+    try:
+        from .brand_loader import load_brand_products_hint
+        hint = load_brand_products_hint()
+    except Exception:
+        hint = None
+
+    if hint:
+        return f"{_VISION_PROMPT}\n\n{hint}"
+    return _VISION_PROMPT
+
+
 class FileParser:
     """文件解析器"""
 
@@ -120,6 +157,7 @@ class FileParser:
         parts = []
         seen_xrefs: set = set()
         llm_client = None  # lazy-init only when an image is found
+        vision_prompt = None  # built lazily alongside the client
 
         with fitz.open(file_path) as doc:
             for page_num, page in enumerate(doc, start=1):
@@ -149,14 +187,9 @@ class FileParser:
 
                         if llm_client is None:
                             llm_client = LLMClient()
+                            vision_prompt = _build_vision_prompt()
 
-                        prompt = (
-                            "Analyze this image extracted from a PDF document. "
-                            "Describe all visible content including: text, numbers, labels, "
-                            "chart/graph data and trends, table contents, diagrams, and key insights. "
-                            "Be specific and detailed."
-                        )
-                        description = llm_client.chat_with_image(img_base64, mime_type, prompt)
+                        description = llm_client.chat_with_image(img_base64, mime_type, vision_prompt)
                         parts.append(f"[Image on page {page_num}]: {description}")
                     except Exception:
                         # silently skip unreadable images
@@ -189,13 +222,7 @@ class FileParser:
             image_base64 = base64.b64encode(f.read()).decode("utf-8")
 
         client = LLMClient()
-        prompt = (
-            "Analyze this image thoroughly. Describe all visible content including: "
-            "any text, numbers, labels, chart/graph data and trends, table contents, "
-            "diagrams, figures, and key insights. Be specific and detailed so the "
-            "description can be used to build a knowledge graph."
-        )
-        return client.chat_with_image(image_base64, mime_type, prompt)
+        return client.chat_with_image(image_base64, mime_type, _build_vision_prompt())
     
     @classmethod
     def extract_from_multiple(cls, file_paths: List[str]) -> str:

@@ -22,6 +22,16 @@ logger = get_logger('mirofish.api.report')
 
 # ============== 报告生成接口 ==============
 
+@report_bp.route('/brand-info', methods=['GET'])
+def brand_info():
+    """
+    Return metadata about the brand configured in brand_knowledge.toml,
+    so the UI can show which brand Brand Mode will use.
+    """
+    from ..utils.brand_loader import get_brand_meta
+    return jsonify({"success": True, "data": get_brand_meta()})
+
+
 @report_bp.route('/generate', methods=['POST'])
 def generate_report():
     """
@@ -715,6 +725,7 @@ def chat_with_report_agent():
         message = data.get('message')
         chat_history = data.get('chat_history', [])
         brand_context = data.get('brand_context') or None
+        brand_mode = bool(data.get('brand_mode', False))
         
         if not simulation_id:
             return jsonify({
@@ -761,7 +772,7 @@ def chat_with_report_agent():
             simulation_requirement=simulation_requirement
         )
         
-        result = agent.chat(message=message, chat_history=chat_history, brand_context=brand_context)
+        result = agent.chat(message=message, chat_history=chat_history, brand_context=brand_context, brand_mode=brand_mode)
         
         return jsonify({
             "success": True,

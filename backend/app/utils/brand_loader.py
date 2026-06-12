@@ -14,18 +14,30 @@ _TOML_PATH = os.path.join(os.path.dirname(__file__), "../../brand_knowledge.toml
 _cached_text: Optional[str] = None
 _cache_mtime: float = 0.0
 
+# Separate cache for the vision product hint.
+_cached_products: Optional[str] = None
+_cache_products_mtime: float = 0.0
 
-def load_brand_knowledge() -> Optional[str]:
+
+def load_brand_knowledge(force: bool = False) -> Optional[str]:
     """
     Return the formatted brand knowledge string, or None if:
     - the file doesn't exist
-    - enabled = false
+    - enabled = false (unless force=True)
     - no meaningful content has been filled in
+
+    force=True ignores the `enabled` flag. Used when the user explicitly
+    turns on Brand Mode in the UI — that toggle is itself the opt-in, so the
+    TOML `enabled` flag (which gates any automatic/implicit usage) is bypassed.
     """
     global _cached_text, _cache_mtime
 
     if not os.path.exists(_TOML_PATH):
         return None
+
+    # Explicit opt-in: parse fresh, ignore the enabled flag and the cache.
+    if force:
+        return _parse_toml(ignore_enabled=True)
 
     mtime = os.path.getmtime(_TOML_PATH)
     if mtime == _cache_mtime:
@@ -36,14 +48,104 @@ def load_brand_knowledge() -> Optional[str]:
     return _cached_text
 
 
-def _parse_toml() -> Optional[str]:
+def get_brand_meta() -> dict:
+    """
+    Lightweight metadata about the configured brand, for display in the UI.
+    Reads name and product count regardless of the `enabled` flag (so the
+    brand-mode panel can confirm what would be loaded).
+
+    Returns:
+        {"configured": bool, "name": str, "tagline": str,
+         "product_count": int, "enabled": bool}
+    """
+    empty = {"configured": False, "name": "", "tagline": "", "product_count": 0, "enabled": False}
+    if not os.path.exists(_TOML_PATH):
+        return empty
+    try:
+        with open(_TOML_PATH, "rb") as f:
+            data = tomllib.load(f)
+    except Exception:
+        return empty
+
+    brand = data.get("brand", {})
+    name = brand.get("name", "").strip()
+    if not name:
+        return empty
+
+    products = [p for p in brand.get("products", []) if p.get("name", "").strip()]
+    return {
+        "configured": True,
+        "name": name,
+        "tagline": brand.get("tagline", "").strip(),
+        "product_count": len(products),
+        "enabled": bool(data.get("enabled", False)),
+    }
+
+
+def load_brand_products_hint() -> Optional[str]:
+    """
+    Return a compact hint listing the brand's products, for use in the
+    image/vision prompt so the model can match a photographed product
+    against the known catalog.
+
+    NOTE: Unlike load_brand_knowledge(), this intentionally does NOT require
+    enabled = true. Matching a photographed product against a factual catalog
+    is a low-risk aid for image extraction, separate from the brand-consultant
+    persona (which still respects the enabled flag).
+
+    Returns None if the file is missing or no products with names are defined.
+    """
+    global _cached_products, _cache_products_mtime
+
+    if not os.path.exists(_TOML_PATH):
+        return None
+
+    mtime = os.path.getmtime(_TOML_PATH)
+    if mtime == _cache_products_mtime:
+        return _cached_products
+
+    _cache_products_mtime = mtime
+    _cached_products = _parse_products_hint()
+    return _cached_products
+
+
+def _parse_products_hint() -> Optional[str]:
     try:
         with open(_TOML_PATH, "rb") as f:
             data = tomllib.load(f)
     except Exception:
         return None
 
-    if not data.get("enabled", False):
+    brand = data.get("brand", {})
+    brand_name = brand.get("name", "").strip()
+    products = [p for p in brand.get("products", []) if p.get("name", "").strip()]
+    if not products:
+        return None
+
+    label = f"{brand_name} products" if brand_name else "known brand products"
+    lines = [
+        f"KNOWN {label.upper()} (for visual matching): If a product or vehicle in the "
+        "image closely resembles one of the following, identify which one it most likely "
+        "is and explain the cues that led you there. If none match, say so rather than "
+        "forcing a match.",
+    ]
+    for p in products:
+        line = f"  • {p['name']}"
+        if p.get("description"):
+            line += f" — {p['description']}"
+        lines.append(line)
+
+    return "\n".join(lines)
+
+
+def _parse_toml(ignore_enabled: bool = False) -> Optional[str]:
+    try:
+        with open(_TOML_PATH, "rb") as f:
+            data = tomllib.load(f)
+    except Exception:
+        return None
+
+    if not ignore_enabled and not data.get("enabled", False):
         return None
 
     brand = data.get("brand", {})

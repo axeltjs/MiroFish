@@ -315,20 +315,22 @@
             </div>
           </div>
 
-          <!-- Brand Context Panel -->
+          <!-- Brand Mode Status Panel -->
           <div v-if="brandMode && chatTarget === 'report_agent'" class="brand-context-panel">
             <div class="brand-panel-header">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
               </svg>
-              <span>{{ $t('step5.brandContextLabel') }}</span>
+              <span>{{ $t('step5.brandMode') }}</span>
             </div>
-            <textarea
-              v-model="brandContext"
-              class="brand-context-input"
-              :placeholder="$t('step5.brandContextPlaceholder')"
-              rows="3"
-            ></textarea>
+            <div v-if="brandInfo && brandInfo.configured" class="brand-status-active">
+              <span class="brand-status-name">{{ brandInfo.name }}</span>
+              <span v-if="brandInfo.tagline" class="brand-status-tagline">"{{ brandInfo.tagline }}"</span>
+              <span class="brand-status-meta">{{ brandInfo.product_count }} produk · dari brand_knowledge.toml</span>
+            </div>
+            <div v-else class="brand-status-empty">
+              Brand belum dikonfigurasi. Isi <code>backend/brand_knowledge.toml</code> untuk mengaktifkan POV brand.
+            </div>
           </div>
 
           <!-- Chat Input -->
@@ -558,7 +560,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { chatWithReport, getReport, getAgentLog } from '../api/report'
+import { chatWithReport, getReport, getAgentLog, getBrandInfo } from '../api/report'
 import { interviewAgents, getSimulationProfilesRealtime } from '../api/simulation'
 import { injectEntity, getGraphData } from '../api/graph'
 
@@ -589,9 +591,9 @@ const isSending = ref(false)
 const chatMessages = ref(null)
 const chatInputRef = ref(null)
 
-// Brand Consultant Mode
+// Brand Consultant Mode (uses brand defined in brand_knowledge.toml)
 const brandMode = ref(false)
-const brandContext = ref('')
+const brandInfo = ref(null)
 
 // Survey State
 const selectedAgents = ref(new Set())
@@ -853,7 +855,7 @@ const sendToReportAgent = async (message) => {
     simulation_id: props.simulationId,
     message: message,
     chat_history: historyForApi,
-    brand_context: (brandMode.value && brandContext.value.trim()) ? brandContext.value.trim() : undefined
+    brand_mode: brandMode.value
   })
   
   if (res.success && res.data) {
@@ -1240,10 +1242,22 @@ const handleClickOutside = (e) => {
 }
 
 // Lifecycle
+const loadBrandInfo = async () => {
+  try {
+    const res = await getBrandInfo()
+    if (res.success) {
+      brandInfo.value = res.data
+    }
+  } catch (err) {
+    console.warn('Could not load brand info:', err.message)
+  }
+}
+
 onMounted(() => {
   addLog(t('log.step5Init'))
   loadReportData()
   loadProfiles()
+  loadBrandInfo()
   document.addEventListener('click', handleClickOutside)
 })
 
@@ -1785,28 +1799,42 @@ watch(() => props.graphId, (newId) => {
   letter-spacing: 0.05em;
 }
 
-.brand-context-input {
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 13px;
-  font-family: inherit;
+.brand-status-active {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.brand-status-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #9A3412;
+}
+
+.brand-status-tagline {
+  font-size: 12px;
+  font-style: italic;
+  color: #C2410C;
+}
+
+.brand-status-meta {
+  font-size: 11px;
+  color: #B45309;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+.brand-status-empty {
+  font-size: 12px;
   line-height: 1.5;
-  border: 1px solid #FDBA74;
-  border-radius: 6px;
-  resize: none;
-  background: #FFFBF7;
-  color: #1C1917;
-  box-sizing: border-box;
-  transition: border-color 0.2s ease;
+  color: #9A3412;
 }
 
-.brand-context-input:focus {
-  outline: none;
-  border-color: #EA580C;
-}
-
-.brand-context-input::placeholder {
-  color: #A8A29E;
+.brand-status-empty code {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 11px;
+  background: #FFEDD5;
+  padding: 1px 5px;
+  border-radius: 4px;
 }
 
 /* Interaction Header */

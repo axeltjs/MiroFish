@@ -49,3 +49,10 @@ export const getReport = (reportId) => {
 export const chatWithReport = (data) => {
   return requestWithRetry(() => service.post('/api/report/chat', data), 3, 1000)
 }
+
+/**
+ * 获取已配置的品牌信息（brand_knowledge.toml）
+ */
+export const getBrandInfo = () => {
+  return service.get('/api/report/brand-info')
+}

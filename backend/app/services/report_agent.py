@@ -1782,7 +1782,8 @@ class ReportAgent:
         self,
         message: str,
         chat_history: List[Dict[str, str]] = None,
-        brand_context: Optional[str] = None
+        brand_context: Optional[str] = None,
+        brand_mode: bool = False
     ) -> Dict[str, Any]:
         """
         与Report Agent对话
@@ -1792,7 +1793,8 @@ class ReportAgent:
         Args:
             message: 用户消息
             chat_history: 对话历史
-            brand_context: 品牌信息（启用品牌顾问模式）
+            brand_context: 自定义品牌/角色上下文覆盖（如注入实体的人设）
+            brand_mode: 是否启用品牌顾问模式（从 brand_knowledge.toml 加载品牌信息）
 
         Returns:
             {
@@ -1817,9 +1819,17 @@ class ReportAgent:
         except Exception as e:
             logger.warning(t('report.fetchReportFailed', error=e))
         
-        # Resolve brand context: UI input takes precedence over the hardcoded file.
+        # Resolve brand context:
+        #  1. An explicit brand_context override (e.g. an injected entity's persona) wins.
+        #  2. Otherwise, if Brand Mode is on, load the configured brand from brand_knowledge.toml.
+        #  3. Otherwise, no brand consultant section.
         from ..utils.brand_loader import load_brand_knowledge
-        effective_brand_context = (brand_context or "").strip() or load_brand_knowledge()
+        if (brand_context or "").strip():
+            effective_brand_context = brand_context.strip()
+        elif brand_mode:
+            effective_brand_context = load_brand_knowledge(force=True)
+        else:
+            effective_brand_context = None
 
         brand_context_section = ""
         if effective_brand_context:
