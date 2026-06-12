@@ -54,6 +54,7 @@
         <Step5Interaction
           :reportId="currentReportId"
           :simulationId="simulationId"
+          :graphId="projectData?.graph_id"
           :systemLogs="systemLogs"
           @add-log="addLog"
           @update-status="updateStatus"

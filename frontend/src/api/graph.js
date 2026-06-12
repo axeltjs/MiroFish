@@ -68,3 +68,16 @@ export function getProject(projectId) {
     method: 'get'
   })
 }
+
+/**
+ * Inject a new entity into an existing Zep graph as a text episode.
+ * @param {String} graphId
+ * @param {Object} data - { name, entity_type, description, relationships }
+ */
+export function injectEntity(graphId, data) {
+  return service({
+    url: `/api/graph/${graphId}/inject-entity`,
+    method: 'post',
+    data
+  })
+}

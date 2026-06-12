@@ -117,17 +117,20 @@
               </button>
               <div v-if="showAgentDropdown" class="dropdown-menu">
                 <div class="dropdown-header">{{ $t('step5.selectChatTarget') }}</div>
-                <div 
-                  v-for="(agent, idx) in profiles" 
+                <div
+                  v-for="(agent, idx) in profiles"
                   :key="idx"
                   class="dropdown-item"
+                  :class="{ 'dropdown-item-injected': agent.isInjected }"
                   @click="selectAgent(agent, idx)"
                 >
-                  <div class="agent-avatar">{{ (agent.username || 'A')[0] }}</div>
+                  <div class="agent-avatar" :class="{ 'avatar-injected': agent.isInjected, 'avatar-graph': agent.isGraphEntity }">{{ (agent.username || 'A')[0] }}</div>
                   <div class="agent-info">
                     <span class="agent-name">{{ agent.username }}</span>
                     <span class="agent-role">{{ agent.profession || $t('step2.unknownProfession') }}</span>
                   </div>
+                  <span v-if="agent.isInjected" class="injected-badge">injected</span>
+                  <span v-else-if="agent.isGraphEntity" class="graph-badge">graph</span>
                 </div>
               </div>
             </div>
@@ -144,6 +147,19 @@
               <span>{{ $t('step5.brandMode') }}</span>
             </button>
             <div class="tab-divider"></div>
+            <button
+              v-if="graphId"
+              class="tab-pill inject-pill"
+              @click="openInjectModal"
+              title="Inject new entity into graph as context"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="16"></line>
+                <line x1="8" y1="12" x2="16" y2="12"></line>
+              </svg>
+              <span>Add Entity</span>
+            </button>
             <button
               class="tab-pill survey-pill"
               :class="{ active: activeTab === 'survey' }"
@@ -436,6 +452,107 @@
       </div>
     </div>
   </div>
+
+  <!-- Inject Entity Modal -->
+  <Transition name="modal-fade">
+    <div v-if="showInjectModal" class="inject-modal-overlay" @click.self="closeInjectModal">
+      <div class="inject-modal">
+        <div class="inject-modal-header">
+          <div class="inject-modal-title">Add Entity to Graph</div>
+          <button class="inject-modal-close" @click="closeInjectModal">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="inject-modal-body">
+          <p class="inject-modal-desc">
+            Inject a new entity as context for Report/Chat without re-running the simulation.
+            Zep will extract it as a graph node automatically.
+          </p>
+
+          <div class="inject-field">
+            <label class="inject-label">Name <span class="inject-required">*</span></label>
+            <input
+              v-model="injectForm.name"
+              class="inject-input"
+              type="text"
+              placeholder="e.g. Budi Santoso"
+            />
+          </div>
+
+          <div class="inject-field">
+            <label class="inject-label">Entity Type</label>
+            <input
+              v-model="injectForm.entity_type"
+              class="inject-input"
+              type="text"
+              placeholder="Person / Organization / Brand / ..."
+            />
+          </div>
+
+          <div class="inject-field">
+            <label class="inject-label">Description</label>
+            <textarea
+              v-model="injectForm.description"
+              class="inject-textarea"
+              rows="3"
+              placeholder="e.g. Head of Brand Communication at Toyota Indonesia, focused on digital campaigns."
+            ></textarea>
+          </div>
+
+          <div class="inject-field-group">
+            <div class="inject-label-row">
+              <label class="inject-label">Relationships to existing nodes</label>
+              <button class="inject-add-rel" @click="injectForm.relationships.push({ relation: '', target: '' })">+ Add</button>
+            </div>
+            <p class="inject-rel-hint">Tulis nama node yang sudah ada di graph (contoh: "Toyota Fortuner") agar terhubung. Zep membuat edge dari teks ini.</p>
+            <div
+              v-for="(rel, idx) in injectForm.relationships"
+              :key="idx"
+              class="inject-rel-row"
+            >
+              <input
+                v-model="rel.relation"
+                class="inject-input inject-input-rel"
+                type="text"
+                placeholder="is distributor of"
+              />
+              <span class="inject-rel-arrow">→</span>
+              <input
+                v-model="rel.target"
+                class="inject-input inject-input-rel"
+                type="text"
+                placeholder="Toyota Fortuner"
+              />
+              <button
+                v-if="injectForm.relationships.length > 1"
+                class="inject-remove-rel"
+                @click="injectForm.relationships.splice(idx, 1)"
+              >×</button>
+            </div>
+          </div>
+
+          <div v-if="injectError" class="inject-error">{{ injectError }}</div>
+          <div v-if="injectSuccess" class="inject-success">{{ injectSuccess }}</div>
+        </div>
+
+        <div class="inject-modal-footer">
+          <button class="inject-btn-cancel" @click="closeInjectModal">Cancel</button>
+          <button
+            class="inject-btn-submit"
+            :disabled="isInjecting || !injectForm.name.trim()"
+            @click="submitInjectEntity"
+          >
+            <span v-if="isInjecting" class="inject-spinner"></span>
+            <span v-else>Inject Entity</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Transition>
 </template>
 
 <script setup>
@@ -443,12 +560,14 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { chatWithReport, getReport, getAgentLog } from '../api/report'
 import { interviewAgents, getSimulationProfilesRealtime } from '../api/simulation'
+import { injectEntity, getGraphData } from '../api/graph'
 
 const { t } = useI18n()
 
 const props = defineProps({
   reportId: String,
-  simulationId: String
+  simulationId: String,
+  graphId: String
 })
 
 const emit = defineEmits(['add-log', 'update-status'])
@@ -479,6 +598,13 @@ const selectedAgents = ref(new Set())
 const surveyQuestion = ref('')
 const surveyResults = ref([])
 const isSurveying = ref(false)
+
+// Inject Entity Modal
+const showInjectModal = ref(false)
+const isInjecting = ref(false)
+const injectSuccess = ref('')
+const injectError = ref('')
+const injectForm = ref({ name: '', entity_type: 'Person', description: '', relationships: [{ relation: '', target: '' }] })
 
 // Report Data
 const reportOutline = ref(null)
@@ -742,11 +868,52 @@ const sendToReportAgent = async (message) => {
   }
 }
 
+const sendToInjectedEntity = async (message, entity) => {
+  addLog(`Sending message to injected entity: ${entity.username}`)
+
+  const historyForApi = chatHistory.value
+    .filter(msg => msg.content !== message)
+    .slice(-10)
+    .map(msg => ({ role: msg.role, content: msg.content }))
+
+  // Instruct the LLM to respond in first-person as this entity
+  const entityPersona = [
+    `You are now roleplaying as ${entity.username}, ${entity.profession}.`,
+    entity.bio ? entity.bio : '',
+    `Respond entirely in first person from ${entity.username}'s perspective.`,
+    `Draw on the simulation context and graph knowledge about this entity's background, relationships, and viewpoint.`
+  ].filter(Boolean).join(' ')
+
+  const res = await chatWithReport({
+    simulation_id: props.simulationId,
+    message: message,
+    chat_history: historyForApi,
+    brand_context: entityPersona
+  })
+
+  if (res.success && res.data) {
+    chatHistory.value.push({
+      role: 'assistant',
+      content: res.data.response || res.data.answer || t('step5.noResponse'),
+      timestamp: new Date().toISOString()
+    })
+    addLog(`${entity.username} replied`)
+  } else {
+    throw new Error(res.error || t('step5.requestFailed'))
+  }
+}
+
 const sendToAgent = async (message) => {
   if (!selectedAgent.value || selectedAgentIndex.value === null) {
     throw new Error(t('step5.selectAgentFirst'))
   }
-  
+
+  // Injected entities and graph entities are not simulation agents — use report agent with persona override
+  if (selectedAgent.value.isInjected || selectedAgent.value.isGraphEntity) {
+    await sendToInjectedEntity(message, selectedAgent.value)
+    return
+  }
+
   addLog(t('log.sendToAgent', { name: selectedAgent.value.username, message: message.substring(0, 50) }))
   
   // Build prompt with chat history
@@ -812,6 +979,66 @@ const scrollToBottom = () => {
       chatMessages.value.scrollTop = chatMessages.value.scrollHeight
     }
   })
+}
+
+// Inject Entity Methods
+const openInjectModal = () => {
+  injectError.value = ''
+  injectSuccess.value = ''
+  showInjectModal.value = true
+}
+
+const closeInjectModal = () => {
+  showInjectModal.value = false
+}
+
+const submitInjectEntity = async () => {
+  if (!props.graphId) {
+    injectError.value = 'Graph ID not available. Please reload the page.'
+    return
+  }
+  if (!injectForm.value.name.trim()) {
+    injectError.value = 'Name is required.'
+    return
+  }
+  isInjecting.value = true
+  injectError.value = ''
+  injectSuccess.value = ''
+
+  const relationships = injectForm.value.relationships
+    .filter(r => r.relation.trim() && r.target.trim())
+    .map(r => ({ relation: r.relation.trim(), target: r.target.trim() }))
+
+  try {
+    const res = await injectEntity(props.graphId, {
+      name: injectForm.value.name.trim(),
+      entity_type: injectForm.value.entity_type.trim() || 'Person',
+      description: injectForm.value.description.trim(),
+      relationships
+    })
+    // service interceptor already unwraps axios response → res is the backend JSON directly
+    if (res.success) {
+      const injectedName = injectForm.value.name.trim()
+      injectSuccess.value = `"${injectedName}" has been added and is now available in Chat with Agent.`
+      addLog(`Entity "${injectedName}" injected into graph`)
+
+      profiles.value.push({
+        username: injectedName,
+        profession: injectForm.value.entity_type.trim() || 'Person',
+        bio: injectForm.value.description.trim(),
+        isInjected: true,
+        episodeText: res.injected?.episode_text || ''
+      })
+
+      injectForm.value = { name: '', entity_type: 'Person', description: '', relationships: [{ relation: '', target: '' }] }
+    } else {
+      injectError.value = res.error || 'Injection failed.'
+    }
+  } catch (err) {
+    injectError.value = err.message || 'Network error.'
+  } finally {
+    isInjecting.value = false
+  }
 }
 
 // Survey Methods
@@ -949,7 +1176,7 @@ const loadAgentLogs = async () => {
 
 const loadProfiles = async () => {
   if (!props.simulationId) return
-  
+
   try {
     const res = await getSimulationProfilesRealtime(props.simulationId, 'reddit')
     if (res.success && res.data) {
@@ -958,6 +1185,49 @@ const loadProfiles = async () => {
     }
   } catch (err) {
     addLog(t('log.loadProfilesFailed', { error: err.message }))
+  }
+
+  // Also load Zep graph entities so users can chat with them directly
+  if (props.graphId) {
+    await loadGraphEntities()
+  }
+}
+
+const loadGraphEntities = async () => {
+  try {
+    const res = await getGraphData(props.graphId)
+    const nodes = res.data?.nodes || res.nodes || []
+
+    const existingNames = new Set(profiles.value.map(p => (p.username || '').toLowerCase()))
+
+    const graphProfiles = []
+    for (const node of nodes) {
+      if (!node.name) continue
+
+      // Only show Person nodes — products, vehicles, brands, etc. make no sense to chat with
+      const labels = node.labels || []
+      if (!labels.some(l => l.toLowerCase() === 'person')) continue
+
+      // Skip if already in simulation profiles
+      if (existingNames.has(node.name.toLowerCase())) continue
+
+      const labelStr = labels.filter(l => l !== 'Entity').join(' / ') || 'Entity'
+      graphProfiles.push({
+        username: node.name,
+        profession: labelStr,
+        bio: node.summary || '',
+        isGraphEntity: true,
+      })
+      existingNames.add(node.name.toLowerCase())
+    }
+
+    if (graphProfiles.length > 0) {
+      profiles.value = [...profiles.value, ...graphProfiles]
+      addLog(`Loaded ${graphProfiles.length} graph entities for chat`)
+    }
+  } catch (err) {
+    // Non-critical: graph entities failing to load shouldn't block the view
+    console.warn('Could not load graph entities:', err.message)
   }
 }
 
@@ -992,6 +1262,13 @@ watch(() => props.simulationId, (newId) => {
     loadProfiles()
   }
 }, { immediate: true })
+
+watch(() => props.graphId, (newId) => {
+  if (newId && profiles.value.length > 0) {
+    // Graph became available after profiles already loaded — append graph entities
+    loadGraphEntities()
+  }
+})
 </script>
 
 <style scoped>
@@ -1347,19 +1624,18 @@ watch(() => props.simulationId, (newId) => {
 /* Action Bar - Professional Design */
 .action-bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 12px 20px 10px;
   border-bottom: 1px solid #E5E7EB;
   background: linear-gradient(180deg, #FFFFFF 0%, #FAFBFC 100%);
-  gap: 16px;
+  gap: 8px;
 }
 
 .action-bar-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-width: 160px;
+  gap: 10px;
 }
 
 .action-bar-icon {
@@ -1369,8 +1645,9 @@ watch(() => props.simulationId, (newId) => {
 
 .action-bar-text {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .action-bar-title {
@@ -1392,16 +1669,15 @@ watch(() => props.simulationId, (newId) => {
 .action-bar-tabs {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
-  flex: 1;
-  justify-content: flex-end;
 }
 
 .tab-pill {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
+  gap: 5px;
+  padding: 6px 12px;
   font-size: 12px;
   font-weight: 500;
   color: #6B7280;
@@ -1441,7 +1717,8 @@ watch(() => props.simulationId, (newId) => {
 }
 
 .agent-pill {
-  width: 200px;
+  max-width: 180px;
+  min-width: 110px;
   justify-content: space-between;
 }
 
@@ -2002,6 +2279,45 @@ watch(() => props.simulationId, (newId) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.dropdown-item-injected {
+  background: #F0F9FF;
+}
+
+.dropdown-item-injected:hover {
+  background: #E0F2FE;
+  border-left-color: #3B82F6;
+}
+
+.avatar-injected {
+  background: linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%) !important;
+}
+
+.avatar-graph {
+  background: linear-gradient(135deg, #6D28D9 0%, #8B5CF6 100%) !important;
+}
+
+.injected-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #1D4ED8;
+  background: #DBEAFE;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.graph-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #6D28D9;
+  background: #EDE9FE;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* Chat Messages */
@@ -2669,6 +2985,310 @@ watch(() => props.simulationId, (newId) => {
   border: none;
   border-top: 1px solid #E5E7EB;
   margin: 24px 0;
+}
+
+/* Inject Entity Button */
+.inject-pill {
+  background: #EFF6FF;
+  color: #1D4ED8;
+}
+
+.inject-pill:hover {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+
+/* Inject Entity Modal */
+.inject-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.inject-modal {
+  background: #FFFFFF;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  width: 480px;
+  max-width: 90vw;
+  display: flex;
+  flex-direction: column;
+}
+
+.inject-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #F3F4F6;
+}
+
+.inject-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.inject-modal-close {
+  width: 30px;
+  height: 30px;
+  background: #F3F4F6;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6B7280;
+}
+
+.inject-modal-close:hover {
+  background: #E5E7EB;
+  color: #374151;
+}
+
+.inject-modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.inject-modal-desc {
+  font-size: 13px;
+  color: #6B7280;
+  line-height: 1.5;
+  margin: 0;
+  padding: 10px 12px;
+  background: #F9FAFB;
+  border-radius: 8px;
+  border-left: 3px solid #3B82F6;
+}
+
+.inject-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inject-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inject-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inject-required {
+  color: #EF4444;
+}
+
+.inject-input {
+  padding: 9px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  border: 1px solid #E5E7EB;
+  border-radius: 7px;
+  color: #111827;
+  transition: border-color 0.2s;
+}
+
+.inject-input:focus {
+  outline: none;
+  border-color: #3B82F6;
+}
+
+.inject-textarea {
+  padding: 9px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  border: 1px solid #E5E7EB;
+  border-radius: 7px;
+  resize: none;
+  color: #111827;
+  transition: border-color 0.2s;
+}
+
+.inject-textarea:focus {
+  outline: none;
+  border-color: #3B82F6;
+}
+
+.inject-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.inject-add-rel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1D4ED8;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  border-radius: 5px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.inject-add-rel:hover {
+  background: #DBEAFE;
+}
+
+.inject-rel-hint {
+  font-size: 11px;
+  color: #6B7280;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.inject-rel-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.inject-rel-row:last-child {
+  margin-bottom: 0;
+}
+
+.inject-input-rel {
+  flex: 1;
+  min-width: 0;
+}
+
+.inject-rel-arrow {
+  font-size: 14px;
+  color: #9CA3AF;
+  flex-shrink: 0;
+}
+
+.inject-remove-rel {
+  width: 24px;
+  height: 24px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 5px;
+  color: #DC2626;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.inject-remove-rel:hover {
+  background: #FEE2E2;
+}
+
+.inject-error {
+  padding: 10px 12px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 7px;
+  font-size: 13px;
+  color: #DC2626;
+}
+
+.inject-success {
+  padding: 10px 12px;
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 7px;
+  font-size: 13px;
+  color: #16A34A;
+}
+
+.inject-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid #F3F4F6;
+}
+
+.inject-btn-cancel {
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  background: #F3F4F6;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.inject-btn-cancel:hover {
+  background: #E5E7EB;
+}
+
+.inject-btn-submit {
+  padding: 9px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  background: #1D4ED8;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 110px;
+  justify-content: center;
+}
+
+.inject-btn-submit:hover:not(:disabled) {
+  background: #1E40AF;
+}
+
+.inject-btn-submit:disabled {
+  background: #93C5FD;
+  cursor: not-allowed;
+}
+
+.inject-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #FFFFFF;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Modal Transition */
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-fade-enter-active .inject-modal,
+.modal-fade-leave-active .inject-modal {
+  transition: transform 0.2s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+.modal-fade-enter-from .inject-modal {
+  transform: scale(0.95) translateY(-8px);
 }
 </style>
 

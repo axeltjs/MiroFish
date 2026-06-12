@@ -595,6 +595,74 @@ def get_graph_data(graph_id: str):
         }), 500
 
 
+@graph_bp.route('/<graph_id>/inject-entity', methods=['POST'])
+def inject_entity(graph_id: str):
+    """
+    Inject a new entity into an existing Zep graph by sending a text episode.
+    Zep AI will automatically extract it as a node with relationships.
+
+    Request JSON:
+        {
+            "name": "Budi Santoso",
+            "entity_type": "Person",
+            "description": "Head of Brand Communication at Toyota Indonesia.",
+            "relationships": [           // optional
+                {"target": "Toyota Indonesia", "relation": "works for"}
+            ]
+        }
+    """
+    try:
+        if not Config.ZEP_API_KEY:
+            return jsonify({"success": False, "error": t('api.zepApiKeyMissing')}), 500
+
+        data = request.get_json() or {}
+        name = (data.get('name') or '').strip()
+        entity_type = (data.get('entity_type') or 'Person').strip()
+        description = (data.get('description') or '').strip()
+        relationships = data.get('relationships') or []
+
+        if not name:
+            return jsonify({"success": False, "error": "name is required"}), 400
+
+        # Build a natural-language episode so Zep extracts a proper node
+        parts = [f"{name} is a {entity_type}."]
+        if description:
+            parts.append(description)
+        for rel in relationships:
+            target = (rel.get('target') or '').strip()
+            relation = (rel.get('relation') or '').strip()
+            if target and relation:
+                parts.append(f"{name} {relation} {target}.")
+
+        episode_text = " ".join(parts)
+
+        from zep_cloud.types import EpisodeData
+        builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
+        builder.client.graph.add_batch(
+            graph_id=graph_id,
+            episodes=[EpisodeData(data=episode_text, type="text")]
+        )
+
+        logger.info(f"Injected entity '{name}' ({entity_type}) into graph {graph_id}")
+
+        return jsonify({
+            "success": True,
+            "injected": {
+                "name": name,
+                "entity_type": entity_type,
+                "episode_text": episode_text
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"inject_entity failed: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 @graph_bp.route('/delete/<graph_id>', methods=['DELETE'])
 def delete_graph(graph_id: str):
     """
