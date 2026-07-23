@@ -132,21 +132,16 @@ async function handleLogout() {
 }
 
 .brand-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid #e3e3e0;
+  height: 46px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 5px;
   flex-shrink: 0;
 }
 
 .brand-mark img {
-  width: 100%;
   height: 100%;
+  width: auto;
   object-fit: contain;
 }
 
