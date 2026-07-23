@@ -1,11 +1,17 @@
 # ── Stage 1: Build Vue.js frontend ─────────────────────────────────────────
 FROM node:20-slim AS frontend-builder
 
-WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
-COPY frontend/ ./
-RUN npm run build
+# src/i18n/index.js imports ../../../locales/ (project root), so mirror the
+# same directory structure that the dev environment provides.
+WORKDIR /app
+
+COPY frontend/package.json frontend/package-lock.json ./frontend/
+RUN npm ci --prefix frontend
+
+COPY frontend/ ./frontend/
+COPY locales/  ./locales/
+
+RUN npm run build --prefix frontend
 
 # ── Stage 2: Production image ───────────────────────────────────────────────
 FROM python:3.11
