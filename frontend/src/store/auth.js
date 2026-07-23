@@ -46,6 +46,17 @@ export function useAuth() {
     _profile.value = null
   }
 
+  async function changePassword(currentPassword, newPassword) {
+    const email = _session.value?.user?.email
+    if (!email) throw new Error('Not signed in')
+
+    const { error: verifyError } = await supabase.auth.signInWithPassword({ email, password: currentPassword })
+    if (verifyError) throw new Error('Password saat ini salah.')
+
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+    if (updateError) throw updateError
+  }
+
   return {
     session: _session,
     profile: _profile,
@@ -56,5 +67,6 @@ export function useAuth() {
     init,
     signIn,
     signOut,
+    changePassword,
   }
 }

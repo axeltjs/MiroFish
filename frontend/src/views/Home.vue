@@ -285,7 +285,7 @@ const startSimulation = () => {
 
 .dropzone:hover { border-color: #708090; background: #f7f7f6; }
 
-.dropzone.drag-over { border-color: #36454f; background: #f0f0ee; }
+.dropzone.drag-over { border-color: #E60012; background: #f0f0ee; }
 
 .dropzone > i { font-size: 26px; color: #708090; margin-bottom: 8px; }
 
@@ -336,7 +336,7 @@ const startSimulation = () => {
   transition: color 0.15s;
 }
 
-.add-more:hover { color: #36454f; }
+.add-more:hover { color: #E60012; }
 
 textarea {
   width: 100%;
@@ -373,7 +373,7 @@ textarea:focus { outline: none; border-color: #708090; background: #fff; }
 
 .btn-primary {
   flex: 1;
-  background: #36454f;
+  background: #E60012;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -389,7 +389,7 @@ textarea:focus { outline: none; border-color: #708090; background: #fff; }
   transition: background 0.15s;
 }
 
-.btn-primary:hover:not(:disabled) { background: #28333b; }
+.btn-primary:hover:not(:disabled) { background: #B8000E; }
 
 .btn-primary:disabled {
   background: #e3e3e0;

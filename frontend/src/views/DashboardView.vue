@@ -160,7 +160,7 @@ h2 {
   padding: 18px;
 }
 
-.stat-card.highlight { border-color: #36454f; }
+.stat-card.highlight { border-color: #E60012; }
 
 .stat-label {
   font-size: 11px;

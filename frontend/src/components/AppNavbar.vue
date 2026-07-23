@@ -31,9 +31,18 @@
 
       <!-- User area -->
       <div class="user-area">
-        <div class="user-info">
-          <div class="avatar" :style="{ background: avatarColor }">{{ userInitial }}</div>
-          <span class="user-email">{{ userEmail }}</span>
+        <div class="user-menu-wrap" ref="userMenuWrapRef">
+          <button class="user-info" @click="showUserMenu = !showUserMenu">
+            <div class="avatar" :style="{ background: avatarColor }">{{ userInitial }}</div>
+            <span class="user-email">{{ userEmail }}</span>
+            <i class="ti ti-chevron-down user-chevron" :class="{ open: showUserMenu }"></i>
+          </button>
+          <div v-if="showUserMenu" class="user-menu">
+            <button class="user-menu-item" @click="openChangePassword">
+              <i class="ti ti-key"></i>
+              <span>Ubah Password</span>
+            </button>
+          </div>
         </div>
         <button class="btn-logout" @click="handleLogout" title="Keluar dari aplikasi">
           <i class="ti ti-logout"></i>
@@ -42,13 +51,16 @@
       </div>
 
     </div>
+
+    <ChangePasswordModal v-if="showChangePassword" @close="showChangePassword = false" />
   </nav>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '../store/auth.js'
+import ChangePasswordModal from './ChangePasswordModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -64,6 +76,24 @@ const avatarColor = computed(() => {
   const idx = email.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) % colors.length
   return colors[idx]
 })
+
+const showUserMenu = ref(false)
+const showChangePassword = ref(false)
+const userMenuWrapRef = ref(null)
+
+function openChangePassword() {
+  showUserMenu.value = false
+  showChangePassword.value = true
+}
+
+function handleClickOutside(event) {
+  if (showUserMenu.value && userMenuWrapRef.value && !userMenuWrapRef.value.contains(event.target)) {
+    showUserMenu.value = false
+  }
+}
+
+onMounted(() => document.addEventListener('click', handleClickOutside))
+onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 
 async function handleLogout() {
   await signOut()
@@ -131,7 +161,7 @@ async function handleLogout() {
   font-weight: 700;
   font-size: 14px;
   letter-spacing: 0.5px;
-  color: #36454f;
+  color: #E60012;
   line-height: 1;
 }
 
@@ -173,12 +203,12 @@ async function handleLogout() {
 
 .nav-item:hover {
   background: #f4f4f2;
-  color: #36454f;
+  color: #E60012;
 }
 
 .nav-item.active {
   background: #f0f0ee;
-  color: #36454f;
+  color: #E60012;
   font-weight: 700;
 }
 
@@ -191,10 +221,74 @@ async function handleLogout() {
   margin-left: auto;
 }
 
+.user-menu-wrap {
+  position: relative;
+}
+
 .user-info {
   display: flex;
   align-items: center;
   gap: 9px;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.15s;
+}
+
+.user-info:hover {
+  background: #f4f4f2;
+}
+
+.user-chevron {
+  font-size: 14px;
+  color: #a0a0a0;
+  transition: transform 0.15s;
+}
+
+.user-chevron.open {
+  transform: rotate(180deg);
+}
+
+.user-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid #e3e3e0;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  padding: 6px;
+  z-index: 60;
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  background: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-family: 'Space Grotesk', sans-serif;
+  color: #36454f;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.user-menu-item:hover {
+  background: #f4f4f2;
+}
+
+.user-menu-item i {
+  font-size: 15px;
+  color: #708090;
 }
 
 .avatar {

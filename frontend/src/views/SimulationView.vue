@@ -411,7 +411,7 @@ onMounted(async () => {
   background: #CCC;
 }
 
-.status-indicator.processing .dot { background: #FF5722; animation: pulse 1s infinite; }
+.status-indicator.processing .dot { background: #E60012; animation: pulse 1s infinite; }
 .status-indicator.completed .dot { background: #4CAF50; }
 .status-indicator.error .dot { background: #F44336; }
 

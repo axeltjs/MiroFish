@@ -187,7 +187,7 @@ input::placeholder { color: #a0a0a0; }
 
 .btn-primary {
   width: 100%;
-  background: #36454f;
+  background: #E60012;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -203,7 +203,7 @@ input::placeholder { color: #a0a0a0; }
   transition: background 0.15s;
 }
 
-.btn-primary:hover:not(:disabled) { background: #28333b; }
+.btn-primary:hover:not(:disabled) { background: #B8000E; }
 
 .btn-primary:disabled {
   background: #e3e3e0;
