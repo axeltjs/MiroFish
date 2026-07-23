@@ -13,7 +13,7 @@ from ..config import Config
 
 class LLMClient:
     """LLM客户端"""
-    
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -23,10 +23,12 @@ class LLMClient:
         self.api_key = api_key or Config.LLM_API_KEY
         self.base_url = base_url or Config.LLM_BASE_URL
         self.model = model or Config.LLM_MODEL_NAME
-        
+        # Accumulated token usage across all calls on this instance
+        self._tokens: Dict[str, int] = {"in": 0, "out": 0, "total": 0}
+
         if not self.api_key:
             raise ValueError("LLM_API_KEY 未配置")
-        
+
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url
@@ -65,6 +67,10 @@ class LLMClient:
         content = response.choices[0].message.content
         # 部分模型（如MiniMax M2.5）会在content中包含<think>思考内容，需要移除
         content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
+        if response.usage:
+            self._tokens['in'] += response.usage.prompt_tokens
+            self._tokens['out'] += response.usage.completion_tokens
+            self._tokens['total'] += response.usage.total_tokens
         return content
     
     def chat_with_image(
@@ -95,7 +101,19 @@ class LLMClient:
             messages=messages,
             max_tokens=max_tokens
         )
+        if response.usage:
+            self._tokens['in'] += response.usage.prompt_tokens
+            self._tokens['out'] += response.usage.completion_tokens
+            self._tokens['total'] += response.usage.total_tokens
         return response.choices[0].message.content or ""
+
+    def get_usage(self) -> Dict[str, int]:
+        """Return accumulated token usage since creation or last reset_usage() call."""
+        return dict(self._tokens)
+
+    def reset_usage(self) -> None:
+        """Reset accumulated token counts to zero."""
+        self._tokens = {"in": 0, "out": 0, "total": 0}
 
     def chat_json(
         self,

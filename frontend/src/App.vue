@@ -1,9 +1,15 @@
 <template>
+  <AppNavbar v-if="showNavbar" />
   <router-view />
 </template>
 
 <script setup>
-// 使用 Vue Router 来管理页面
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import AppNavbar from './components/AppNavbar.vue'
+
+const route = useRoute()
+const showNavbar = computed(() => route.name !== 'Login' && route.name !== undefined)
 </script>
 
 <style>

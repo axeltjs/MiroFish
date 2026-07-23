@@ -1,20 +1,6 @@
 <template>
   <div class="wrap">
 
-    <!-- Top bar -->
-    <div class="topbar">
-      <div class="brand">
-        <div class="brand-mark">
-          <img src="../assets/logo/mmc-logo.png" alt="Mitsubishi Motors" class="brand-logo" />
-        </div>
-        <div>
-          <div class="brand-name">MIROFISH</div>
-          <div class="brand-sub">MMKSI internal · prediction engine</div>
-        </div>
-      </div>
-      <div class="status-pill"><span class="dot"></span> engine ready · MiroFish-V1.0</div>
-    </div>
-
     <!-- Flow strip -->
     <h2>Working Flow</h2>
     <br>
@@ -121,7 +107,6 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
-
 const router = useRouter()
 
 const formData = ref({ simulationRequirement: '' })
@@ -191,63 +176,6 @@ const startSimulation = () => {
   font-family: var(--sans, 'Space Grotesk', sans-serif);
   color: #36454f;
   -webkit-font-smoothing: antialiased;
-}
-
-/* ── Top bar ── */
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 20px;
-  margin-bottom: 28px;
-  border-bottom: 1px solid #e3e3e0;
-}
-
-.brand { display: flex; align-items: center; gap: 10px; }
-
-.brand-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  background: #fff;
-  border: 1px solid #e3e3e0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 4px;
-}
-
-.brand-logo {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.brand-name {
-  font-family: var(--mono, monospace);
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: 0.5px;
-}
-
-.brand-sub { font-size: 12px; color: #708090; font-family: var(--mono, monospace); }
-
-.status-pill {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  color: #708090;
-  font-family: var(--mono, monospace);
-}
-
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #5dcaa5;
-  flex-shrink: 0;
 }
 
 /* ── Flow strip ── */
