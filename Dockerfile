@@ -11,6 +11,12 @@ RUN npm ci --prefix frontend
 COPY frontend/ ./frontend/
 COPY locales/  ./locales/
 
+# Vite inlines VITE_* variables into the static bundle at build time, not at
+# container runtime — they must be supplied as build args, not via .env/env_file.
+ARG VITE_API_BASE_URL
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+
 RUN npm run build --prefix frontend
 
 # ── Stage 2: Production image ───────────────────────────────────────────────
