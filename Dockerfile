@@ -34,6 +34,9 @@ RUN cd backend && uv sync --no-dev
 # Copy backend source
 COPY backend/ ./backend/
 
+# Copy shared locales (backend/app/utils/locale.py reads ../../../locales/)
+COPY locales/ ./locales/
+
 # Copy built frontend from Stage 1
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
 
