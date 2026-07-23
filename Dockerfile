@@ -1,29 +1,40 @@
+# ── Stage 1: Build Vue.js frontend ─────────────────────────────────────────
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+# ── Stage 2: Production image ───────────────────────────────────────────────
 FROM python:3.11
 
-# 安装 Node.js （满足 >=18）及必要工具
+# Install Nginx and Supervisor
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends nodejs npm \
-  && rm -rf /var/lib/apt/lists/*
+  && apt-get install -y --no-install-recommends nginx supervisor \
+  && rm -rf /var/lib/apt/lists/* \
+  && rm /etc/nginx/sites-enabled/default
 
-# 从 uv 官方镜像复制 uv
+# Copy uv from official image
 COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
 
 WORKDIR /app
 
-# 先复制依赖描述文件以利用缓存
-COPY package.json package-lock.json ./
-COPY frontend/package.json frontend/package-lock.json ./frontend/
+# Install Python dependencies (cached layer — only rebuilds when deps change)
 COPY backend/pyproject.toml backend/uv.lock ./backend/
+RUN cd backend && uv sync --no-dev
 
-# 安装依赖（Node + Python）
-RUN npm ci \
-  && npm ci --prefix frontend \
-  && cd backend && uv sync --frozen
+# Copy backend source
+COPY backend/ ./backend/
 
-# 复制项目源码
-COPY . .
+# Copy built frontend from Stage 1
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+
+# Copy Nginx and Supervisor configs
+COPY nginx.conf /etc/nginx/sites-enabled/mirofish.conf
+COPY supervisord.conf /etc/supervisor/conf.d/mirofish.conf
 
 EXPOSE 3000 5001
 
-# 同时启动前后端（开发模式）
-CMD ["npm", "run", "dev"]
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]
