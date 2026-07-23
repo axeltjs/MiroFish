@@ -36,7 +36,7 @@ router.beforeEach((to) => {
     return true
   }
 
-  if (false && !isAuthenticated.value) return { name: 'Login', query: { redirect: to.fullPath } }
+  if (!isAuthenticated.value) return { name: 'Login', query: { redirect: to.fullPath } }
 
   if (to.meta.requiresAdmin && !isAdmin.value) return { name: 'Home' }
 

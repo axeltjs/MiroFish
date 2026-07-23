@@ -1,5 +1,6 @@
 import axios from 'axios'
 import i18n from '../i18n'
+import { useAuth } from '../store/auth.js'
 
 // 创建axios实例
 const service = axios.create({
@@ -14,6 +15,11 @@ const service = axios.create({
 service.interceptors.request.use(
   config => {
     config.headers['Accept-Language'] = i18n.global.locale.value
+
+    const { session } = useAuth()
+    const token = session.value?.access_token
+    if (token) config.headers['Authorization'] = `Bearer ${token}`
+
     return config
   },
   error => {

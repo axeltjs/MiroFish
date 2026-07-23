@@ -16,11 +16,19 @@ from ..services.text_processor import TextProcessor
 from ..utils.file_parser import FileParser
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
+from ..utils.auth import require_auth
 from ..models.task import TaskManager, TaskStatus
 from ..models.project import ProjectManager, ProjectStatus
 
 # 获取日志器
 logger = get_logger('mirofish.api')
+
+
+@graph_bp.before_request
+def _check_auth():
+    _user_id, err = require_auth()
+    if err:
+        return err
 
 
 def allowed_file(filename: str) -> bool:

@@ -15,9 +15,17 @@ from ..services.simulation_manager import SimulationManager, SimulationStatus
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
+from ..utils.auth import require_auth
 from ..models.project import ProjectManager
 
 logger = get_logger('mirofish.api.simulation')
+
+
+@simulation_bp.before_request
+def _check_auth():
+    _user_id, err = require_auth()
+    if err:
+        return err
 
 
 # Interview prompt 优化前缀

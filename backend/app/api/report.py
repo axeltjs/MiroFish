@@ -16,8 +16,16 @@ from ..models.project import ProjectManager
 from ..models.task import TaskManager, TaskStatus
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
+from ..utils.auth import require_auth
 
 logger = get_logger('mirofish.api.report')
+
+
+@report_bp.before_request
+def _check_auth():
+    _user_id, err = require_auth()
+    if err:
+        return err
 
 
 # ============== 报告生成接口 ==============
