@@ -18,7 +18,7 @@
           <input
             v-model="email"
             type="email"
-            placeholder="you@mmksi.com"
+            placeholder="you@mitsubishi-motors.co.id"
             :disabled="loading"
             @keyup.enter="handleLogin"
           />
